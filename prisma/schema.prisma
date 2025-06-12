@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String        @id @default(cuid())
+  name               String
+  email              String        @unique
+  phone              String?       @unique
+  role               UserRoleTypes @default(user)
+  image              String?
+  profileImageUrl    String?
+  registrationNumber String?       @unique
+  bio                String?
+  course             String?
+  graduationYear     String?
+  dayScholar         Boolean?
+  dob                DateTime?
+  instagramUrl       String?
+  facebookUrl        String?
+  githubUrl          String?
+  linkedinUrl        String?
+  twitterUrl         String?
+
+  // Relationships
+  uploadedMaterials StudyMaterial[] @relation("MaterialUploader")
+  likedMaterials    MaterialLike[]
+  comments          Comment[]
+
+  // Activity tracking
+  lastLoginAt DateTime?
+  isActive    Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  years       Int       @default(4)
+  description String?
+  subjects    Subject[]
+
+  // Metadata
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("courses")
+}
+
+model Subject {
+  id          String  @id @default(cuid())
+  name        String
+  code        String
+  description String?
+  credits     Int?
+  year        Int
+  semester    Int? // Added semester support
+
+  // Relationships
+  course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId       String
+  chapters       Chapter[]
+  studyMaterials StudyMaterial[]
+
+  // Metadata
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, courseId])
+  @@map("subjects")
+}
+
+model Chapter {
+  id          String  @id @default(cuid())
+  name        String
+  number      Int
+  description String?
+
+  // Relationships
+  subjectId      String
+  subject        Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  studyMaterials StudyMaterial[]
+
+  // Metadata
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([number, subjectId])
+  @@map("chapters")
+}
+
+model StudyMaterial {
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  fileName     String
+  fileUrl      String
+  fileSize     BigInt?
+  fileType     FileTypes
+  materialType MaterialTypes @default(notes)
+
+  // Permissions and visibility
+  isPublic   Boolean @default(true)
+  isApproved Boolean @default(false)
+
+  // Analytics
+  downloadCount Int @default(0)
+  viewCount     Int @default(0)
+
+  // Relationships
+  uploadedById String?
+  uploadedBy   User?   @relation("MaterialUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  likes    MaterialLike[]
+  comments Comment[]
+  tags     String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([materialType])
+  @@index([isPublic, isApproved])
+  @@index([subjectId])
+  @@index([chapterId])
+  @@map("study_materials")
+}
+
+model MaterialLike {
+  id         String @id @default(cuid())
+  userId     String
+  materialId String
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, materialId])
+  @@map("material_likes")
+}
+
+model Comment {
+  id      String @id @default(cuid())
+  content String
+
+  // Relationships
+  userId     String
+  materialId String
+  parentId   String? // For nested comments
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  parent   Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[]     @relation("CommentReplies")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  data      Json
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("logs")
+}
+
+enum UserRoleTypes {
+  superAdmin
+  admin
+  moderator
+  user
+}
+
+enum FileTypes {
+  youtube
+  pdf
+  ppt
+  pptx
+  doc
+  docx
+  txt
+  zip
+  rar
+  jpg
+  jpeg
+  png
+  gif
+  webp
+  mp4
+  mp3
+  wav
+  xlsx
+  xls
+  csv
+}
+
+enum MaterialTypes {
+  youtubeVideo
+  lectures
+  notes
+  assignments
+  previousPapers
+  presentations
+  practicals
+  reference
+  syllabus
+  tutorial
+  quiz
+  exam
+}
