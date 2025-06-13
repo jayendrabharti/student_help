@@ -8,29 +8,45 @@ datasource db {
 }
 
 model User {
-  id                 String        @id @default(cuid())
-  name               String
-  email              String        @unique
-  phone              String?       @unique
-  role               UserRoleTypes @default(user)
-  image              String?
-  profileImageUrl    String?
-  registrationNumber String?       @unique
-  bio                String?
-  course             String?
-  graduationYear     String?
-  dayScholar         Boolean?
-  dob                DateTime?
-  instagramUrl       String?
-  facebookUrl        String?
-  githubUrl          String?
-  linkedinUrl        String?
-  twitterUrl         String?
-
-  // Relationships
-  uploadedMaterials StudyMaterial[] @relation("MaterialUploader")
-  likedMaterials    MaterialLike[]
-  comments          Comment[]
+  id                         String             @id @default(cuid())
+  name                       String
+  username                   String?
+  email                      String             @unique
+  phone                      String?            @unique
+  role                       UserRoleTypes      @default(user)
+  image                      String?
+  profileImageUrl            String?
+  registrationNumber         String?            @unique
+  registrationNumberVerified Boolean            @default(false)
+  bio                        String?
+  course                     String?
+  graduationYear             String?
+  dayScholar                 Boolean?
+  dob                        DateTime?
+  resumeUrl                  String?
+  skills                     String[]
+  instagramUrl               String?
+  facebookUrl                String?
+  githubUrl                  String?
+  linkedinUrl                String?
+  twitterUrl                 String?
+  uploadedMaterials          StudyMaterial[]    @relation("MaterialUploader")
+  likes                      Like[]
+  comments                   Comment[]
+  votes                      Vote[]
+  codes                      Code[]
+  messages                   ContactMessage[]
+  doubts                     Doubt[]
+  solutions                  Solution[]
+  announcements              Announcement[]
+  reminders                  Reminder[]
+  communityAdmins            CommunityAdmin[]
+  communityMemberships       Membership[]
+  communityMessages          CommunityMessage[]
+  blogs                      Blog[]
+  quizzes                    Quiz[]
+  chats                      Chat[]             @relation("UserChats")
+  blockedUsersIds            String[]
 
   // Activity tracking
   lastLoginAt DateTime?
@@ -39,7 +55,84 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([email])
+  @@index([phone])
+  @@index([registrationNumber])
+  @@index([role])
+  @@index([isActive])
   @@map("users")
+}
+
+model Code {
+  id              String         @id @default(cuid())
+  name            String?
+  language        String?
+  code            String?
+  input           String?
+  output          String?
+  shareWithEmails String[]
+  shareWith       ShareWithTypes
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([shareWith])
+  @@map("codes")
+}
+
+model ContactMessage {
+  id        String             @id @default(cuid())
+  type      ContactMessageType
+  subject   String?
+  text      String
+  userEmail String
+  user      User               @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  isDeleted Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userEmail])
+  @@index([type])
+  @@index([isDeleted])
+  @@map("messages")
+}
+
+model Doubt {
+  id        String     @id @default(cuid())
+  solved    Boolean    @default(false)
+  content   Json
+  userEmail String
+  user      User       @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  solutions Solution[]
+  tags      String[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userEmail])
+  @@index([solved])
+  @@map("doubts")
+}
+
+model Solution {
+  id            String    @id @default(cuid())
+  content       Json
+  isAiGenerated Boolean   @default(false)
+  isVerified    Boolean   @default(false)
+  comments      Comment[]
+  votes         Vote[]
+  doubtId       String
+  doubt         Doubt     @relation(fields: [doubtId], references: [id], onDelete: Cascade)
+  userEmail     String?
+  user          User?     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([doubtId])
+  @@index([userEmail])
+  @@index([isVerified])
+  @@map("solutions")
 }
 
 model Course {
@@ -47,6 +140,7 @@ model Course {
   name        String
   code        String    @unique
   years       Int       @default(4)
+  semester    Int       @default(8)
   description String?
   subjects    Subject[]
 
@@ -56,17 +150,19 @@ model Course {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([code])
+  @@index([isActive])
   @@map("courses")
 }
 
 model Subject {
   id          String  @id @default(cuid())
   name        String
-  code        String
+  code        String  @unique
   description String?
   credits     Int?
   year        Int
-  semester    Int? // Added semester support
+  semester    Int
 
   // Relationships
   course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -80,7 +176,10 @@ model Subject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([code, courseId])
+  @@index([courseId])
+  @@index([year])
+  @@index([semester])
+  @@index([isActive])
   @@map("subjects")
 }
 
@@ -102,17 +201,33 @@ model Chapter {
   updatedAt DateTime @updatedAt
 
   @@unique([number, subjectId])
+  @@index([subjectId])
+  @@index([isActive])
   @@map("chapters")
+}
+
+model File {
+  id              String         @id @default(cuid())
+  description     String?
+  name            String?
+  url             String?
+  size            BigInt?
+  type            FileTypes
+  studyMaterialId String?
+  studyMaterial   StudyMaterial? @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([studyMaterialId])
+  @@index([type])
+  @@map("files")
 }
 
 model StudyMaterial {
   id           String        @id @default(cuid())
   title        String
-  description  String?
-  fileName     String
-  fileUrl      String
-  fileSize     BigInt?
-  fileType     FileTypes
+  content      Json
+  files        File[]
   materialType MaterialTypes @default(notes)
 
   // Permissions and visibility
@@ -124,8 +239,11 @@ model StudyMaterial {
   viewCount     Int @default(0)
 
   // Relationships
-  uploadedById String?
-  uploadedBy   User?   @relation("MaterialUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  quizId String?
+  quiz   Quiz?   @relation
+
+  uploadedById String
+  uploadedBy   User   @relation("MaterialUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
   subjectId String?
   subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -133,7 +251,7 @@ model StudyMaterial {
   chapterId String?
   chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
-  likes    MaterialLike[]
+  likes    Like[]
   comments Comment[]
   tags     String[]
 
@@ -144,40 +262,74 @@ model StudyMaterial {
   @@index([isPublic, isApproved])
   @@index([subjectId])
   @@index([chapterId])
+  @@index([uploadedById])
+  @@index([isApproved])
   @@map("study_materials")
 }
 
-model MaterialLike {
-  id         String @id @default(cuid())
+model Like {
+  id         String  @id @default(cuid())
   userId     String
-  materialId String
+  materialId String?
+  blogId     String?
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  blog     Blog?          @relation(fields: [blogId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@unique([userId, materialId])
-  @@map("material_likes")
+  @@unique([userId, blogId])
+  @@index([userId])
+  @@index([materialId])
+  @@index([blogId])
+  @@map("likes")
+}
+
+model Vote {
+  id         String   @id @default(cuid())
+  userId     String
+  solutionId String
+  type       VoteType
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  solution   Solution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, solutionId])
+  @@index([userId])
+  @@index([solutionId])
+  @@index([type])
+  @@map("solution_votes")
 }
 
 model Comment {
-  id      String @id @default(cuid())
-  content String
+  id   String @id @default(cuid())
+  text String
 
   // Relationships
   userId     String
-  materialId String
+  materialId String?
+  solutionId String?
+  blogId     String?
   parentId   String? // For nested comments
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  parent   Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[]     @relation("CommentReplies")
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  solution Solution?      @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  blog     Blog?          @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  parent   Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[]      @relation("CommentReplies")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([userId])
+  @@index([materialId])
+  @@index([solutionId])
+  @@index([blogId])
+  @@index([parentId])
   @@map("comments")
 }
 
@@ -188,13 +340,168 @@ model Log {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([createdAt])
   @@map("logs")
 }
+
+model Community {
+  id                 String             @id @default(cuid())
+  name               String
+  bio                String?
+  logoUrl            String?
+  admins             CommunityAdmin[]
+  memberships        Membership[]
+  communityMessages  CommunityMessage[]
+  allowMemberMessage Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([name])
+  @@index([allowMemberMessage])
+  @@map("communities")
+}
+
+model CommunityAdmin {
+  id          String    @id @default(cuid())
+  userId      String
+  communityId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, communityId])
+  @@index([userId])
+  @@index([communityId])
+}
+
+model CommunityMessage {
+  id           String    @id @default(cuid())
+  content      Json
+  userId       String
+  readByEmails String[]
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isPublic     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([communityId])
+  @@index([userId])
+  @@index([isPublic])
+  @@map("community_messages")
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  userEmail   String
+  communityId String
+  joinType    JoinTypes @default(page)
+  accepted    Boolean   @default(false)
+  user        User?     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+
+  @@index([userEmail])
+  @@index([communityId])
+  @@index([accepted])
+  @@index([joinType])
+  @@map("memberships")
+}
+
+model Announcement {
+  id           String   @id @default(cuid())
+  title        String?
+  content      String?
+  readByEmails String[]
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@map("announcements")
+}
+
+model Reminder {
+  id           String       @id @default(cuid())
+  text         String
+  reminderType ReminderType
+  time         DateTime
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([reminderType])
+  @@index([time])
+  @@map("reminders")
+}
+
+model Blog {
+  id        String    @id @default(cuid())
+  content   Json
+  tags      String[]
+  comments  Comment[]
+  likes     Like[]
+  views     Int       @default(0)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([views])
+  @@map("blogs")
+}
+
+model Quiz {
+  id              String        @id @default(cuid())
+  title           String
+  subjectId       String?
+  chapterId       String?
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyMaterialId String        @unique
+  studyMaterial   StudyMaterial @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([chapterId])
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  users     User[]    @relation("UserChats")
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([createdAt])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  senderId  String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  chatId    String
+  createdAt DateTime @default(now())
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// ########## ENUM ###############
 
 enum UserRoleTypes {
   superAdmin
   admin
-  moderator
+  mentor
   user
 }
 
@@ -211,27 +518,56 @@ enum FileTypes {
   jpg
   jpeg
   png
-  gif
   webp
+  mkv
   mp4
   mp3
   wav
   xlsx
   xls
   csv
+  other
 }
 
 enum MaterialTypes {
-  youtubeVideo
   lectures
   notes
   assignments
-  previousPapers
-  presentations
-  practicals
+  pyq
+  ppt
   reference
   syllabus
   tutorial
   quiz
+}
+
+enum ContactMessageType {
+  materialRequest
+  complain
+  enquiry
+  others
+}
+
+enum VoteType {
+  upvote
+  downvote
+}
+
+enum ReminderType {
   exam
+  class
+  event
+  other
+}
+
+enum ShareWithTypes {
+  anyoneWithLink
+  allowedOnly
+}
+
+enum JoinTypes {
+  page
+  link
+  request
+  invite
 }
