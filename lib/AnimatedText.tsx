@@ -24,7 +24,7 @@ export default function AnimatedText({
 
     const timeout = setTimeout(() => {
       const intv = setInterval(() => {
-        setDisplayText((prev) => {
+        setDisplayText(() => {
           const next = text.slice(0, currentIndex + 1);
           currentIndex++;
           if (currentIndex >= text.length) {
